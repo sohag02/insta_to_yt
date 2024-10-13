@@ -5,3 +5,5 @@ token.json
 session_*.json
 __pycache__
 *.rar
+proxy.txt
+old_reels.json

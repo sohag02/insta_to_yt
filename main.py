@@ -3,7 +3,8 @@ import os
 import shutil
 import schedule
 import random
-
+import json
+import requests
 from scrapper import Scrapper
 from utils import *
 from yt import get_authenticated_service, upload_video
@@ -23,20 +24,35 @@ def remove_directory(directory):
         shutil.rmtree(directory)
 
 
-def old_video_upload(scrapper: Scrapper):
+def get_all_reels(scrapper: Scrapper):
     username = read_username()
-    uploaded = load_uploaded_reels()
-    reels = scrapper.get_reels(username, len(uploaded) + 1)
-    reels.reverse()
-    for reel in reels:
-        if not is_reel_uploaded(reel.code):
-            path = None
+    print(f"Scrapping all reels from @{username}...")
+    reels = scrapper.get_reels(username)
+    with open("old_reels.json", "w") as file:
+        json.dump(
+            {
+                "reels": [reel.pk for reel in reels],
+            },
+            file,
+            indent=4,
+        )
+    print(f"Scrapped {len(reels)} reels Successfully!")
+
+
+def old_video_upload(scrapper: Scrapper):
+    old_reels = get_old_reels()
+    reel = old_reels[-1]
+    path = None
+    for _ in range(2):
+        retries = 3  # Number of retries
+        for attempt in range(retries):
             try:
-                path = scrapper.download_reel(reel.video_url)
+                path = scrapper.clip_download(reel)
+                reel_info = scrapper.media_info(reel)
                 youtube = get_authenticated_service()
                 titles = load_titles()
                 title = random.choice(titles) + " #shorts"
-                description = title + "\n" + reel.caption_text
+                description = title + "\n" + reel_info.caption_text
                 print("Uploading Reel to YT")
                 res = upload_video(
                     youtube,
@@ -50,12 +66,18 @@ def old_video_upload(scrapper: Scrapper):
                     "Reel uploaded Successfully : ",
                     "https://www.youtube.com/shorts/" + res["id"],
                 )
-                save_uploaded_reels(reel.code)
-            except Exception as e:
-                print("Error uploading reel : ", reel.code)
-                raise
+                save_uploaded_reels(reel)
+                save_old_reels(old_reels[:-1])
+                break  # Exit loop if successful
+            except (Exception, requests.exceptions.ReadTimeout) as e:
+                print(f"Error uploading reel on attempt {attempt + 1}: ", reel)
+                if attempt < retries - 1:
+                    print("Retrying...")
+                    time.sleep(5)  # Wait before retrying
+                else:
+                    raise  # Raise the exception if all retries fail
             finally:
-                if path:
+                if path and os.path.exists(path):
                     os.remove(path)
 
 
@@ -129,10 +151,17 @@ def schedule_jobs_from_file():
     upload_acc = get_uploding_account()
     monitoring_acc = get_monitoring_account()
 
-    upload_scrapper = Scrapper(upload_acc[0], upload_acc[1])
-    if os.path.exists("proxy.txt"):
-        proxy = get_proxy()
-        upload_scrapper.set_proxy(proxy)
+    proxy = None
+    # if os.path.exists("proxy.txt"):
+    #     proxy = get_proxy()
+    #     print(f'Using proxy: {proxy}')
+
+    upload_scrapper = Scrapper(upload_acc[0], upload_acc[1], proxy=proxy)
+
+    # scrape old reels
+    if not os.path.exists("old_reels.json"):
+        get_all_reels(upload_scrapper)
+
     if monitoring_acc == upload_acc:
         monitoring_scrapper = upload_scrapper
     else:

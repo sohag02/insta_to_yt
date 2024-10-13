@@ -1,35 +1,39 @@
 from instagrapi import Client
 import os
 
-class Scrapper:
-    def __init__(self, username:str, password:str, new_session=False):
-        self.cl = Client()
+class Scrapper(Client):
+    def __init__(self, username:str, password:str, new_session=False, proxy=None):
+        super().__init__()
+        if proxy:
+            self.set_proxy(proxy)
         if os.path.exists(f'session_{username}.json') and new_session is False:
-            self.cl.load_settings(f'session_{username}.json')
-            self.cl.login(username, password)
+            self.load_settings(f'session_{username}.json')
+            self.login(username, password)
             try:
-                self.cl.get_timeline_feed()
+                self.get_timeline_feed()
+                print('Logged in with old session')
             except Exception as e:
-                print('Login failed')
-                raise e
-            print('Logged in with old session')
+                print('Login failed with old session, deleting old session file...')
+                os.remove(f'session_{username}.json')
+                print('Run the program again to login with new session.')
+                exit()
         else:
-            self.cl.login(username, password)
-            self.cl.dump_settings(f'session_{username}.json')
+            self.login(username, password)
+            self.dump_settings(f'session_{username}.json')
             print('Logged in with new session')
 
-    def set_proxy(self, proxy):
-        self.cl.set_proxy(proxy)
+    def use_proxy(self, proxy):
+        self.set_proxy(proxy)
 
     def download_reels(self, username, count=0):
 
-        user_id = self.cl.user_id_from_username(username)
-        medias = self.cl.user_clips(user_id, 0)
+        user_id = self.user_id_from_username(username)
+        medias = self.user_clips(user_id, 0)
         reels = []
         count = 0
         for media in medias:
             if media.video_url is not None:
-                path = self.cl.clip_download_by_url(media.video_url)
+                path = self.clip_download_by_url(media.video_url)
                 reels.append(path)
                 count += 1
     
@@ -38,20 +42,20 @@ class Scrapper:
         return reels
     
     def get_reels(self, username, count=0):
-        user_id = self.cl.user_id_from_username(username)
-        medias = self.cl.user_clips(user_id, count)
+        user_id = self.user_id_from_username(username)
+        medias = self.user_clips(user_id, count)
         
         return medias
     
     def check_for_new_reel(self, username, latest_reel):
-        user_id = self.cl.user_id_from_username(username)
+        user_id = self.user_id_from_username(username)
 
-        media = self.cl.user_clips(user_id, 1)
+        media = self.user_clips(user_id, 1)
         if media[0].code != latest_reel:
             return media[0].video_url, media[0].code
         
         return None
 
     def download_reel(self, url):
-        path = self.cl.clip_download_by_url(url)
+        path = self.clip_download_by_url(url)
         return path
