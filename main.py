@@ -95,10 +95,12 @@ def new_video_upload(scrapper: Scrapper):
         path = None
         try:
             path = scrapper.download_reel(new_reel)
+            reel_pk = scrapper.media_pk_from_code(new_reel_code)
+            reel_info = scrapper.media_info(reel_pk)
             youtube = get_authenticated_service()
             titles = load_titles()
             title = random.choice(titles) + " #shorts"
-            description = title + "\n" + new_reel
+            description = title + "\n" + reel_info.caption_text
             print("Uploading Reel to YT")
             res = upload_video(
                 youtube,
@@ -112,9 +114,9 @@ def new_video_upload(scrapper: Scrapper):
                 "Reel uploaded Successfully : ",
                 "https://www.youtube.com/shorts/" + res["id"],
             )
-            save_uploaded_reels(new_reel)
+            save_uploaded_reels(new_reel_code)
             with open("latest_reel.txt", "w") as file:
-                file.write(new_reel)
+                file.write(new_reel_code)
         except Exception as e:
             print("Error uploading reel : ", new_reel_code)
             raise
@@ -170,7 +172,7 @@ def schedule_jobs_from_file():
             proxy = get_proxy()
             upload_scrapper.set_proxy(proxy)
     if len(times) >= 1:
-        schedule.every().day.at(times[0]).do(old_video_upload, upload_scrapper)
+        schedule.every().day.at(times[0], 'Asia/Kolkata').do(old_video_upload, upload_scrapper)
         schedule.every().hour.do(new_video_upload, monitoring_scrapper)
         print("Reels will be uploaded every day at " + times[0])
         print("Monitoring For new reels every hour")
