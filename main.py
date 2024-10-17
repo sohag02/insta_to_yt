@@ -40,10 +40,10 @@ def get_all_reels(scrapper: Scrapper):
 
 
 def old_video_upload(scrapper: Scrapper):
-    old_reels = get_old_reels()
-    reel = old_reels[-1]
-    path = None
     for _ in range(2):
+        path = None
+        old_reels = get_old_reels()
+        reel = old_reels[-1]
         retries = 3  # Number of retries
         for attempt in range(retries):
             try:
@@ -75,7 +75,7 @@ def old_video_upload(scrapper: Scrapper):
                     print("Retrying...")
                     time.sleep(5)  # Wait before retrying
                 else:
-                    raise  # Raise the exception if all retries fail
+                    print(e)
             finally:
                 if path and os.path.exists(path):
                     os.remove(path)
@@ -119,7 +119,7 @@ def new_video_upload(scrapper: Scrapper):
                 file.write(new_reel_code)
         except Exception as e:
             print("Error uploading reel : ", new_reel_code)
-            raise
+            print(e)
         finally:
             if path:
                 os.remove(path)
