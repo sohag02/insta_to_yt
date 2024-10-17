@@ -10,20 +10,6 @@ from utils import *
 from yt import get_authenticated_service, upload_video
 
 
-# Create directory for downloads
-def create_directory(username):
-    directory = f"./{username}"
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    return directory
-
-
-# Remove directory and its contents
-def remove_directory(directory):
-    if os.path.exists(directory):
-        shutil.rmtree(directory)
-
-
 def get_all_reels(scrapper: Scrapper):
     username = read_username()
     print(f"Scrapping all reels from @{username}...")
@@ -60,7 +46,6 @@ def old_video_upload(scrapper: Scrapper):
                     title,
                     description,
                     tags=["money", "trading", "ebook"],
-                    privacy_status="public",
                 )
                 print(
                     "Reel uploaded Successfully : ",
@@ -108,7 +93,6 @@ def new_video_upload(scrapper: Scrapper):
                 title,
                 description,
                 tags=["money", "trading", "ebook"],
-                privacy_status="public",
             )
             print(
                 "Reel uploaded Successfully : ",
@@ -154,9 +138,9 @@ def schedule_jobs_from_file():
     monitoring_acc = get_monitoring_account()
 
     proxy = None
-    # if os.path.exists("proxy.txt"):
-    #     proxy = get_proxy()
-    #     print(f'Using proxy: {proxy}')
+    if os.path.exists("proxy.txt"):
+        proxy = get_proxy()
+        if proxy is not None: print(f'Using proxy: {proxy}')
 
     upload_scrapper = Scrapper(upload_acc[0], upload_acc[1], proxy=proxy)
 
@@ -184,7 +168,6 @@ def schedule_jobs_from_file():
 
 # Main loop to schedule tasks
 if __name__ == "__main__":
-    get_authenticated_service(generate_session=True)
     generate_required_files()
     schedule_jobs_from_file()  # Schedule jobs based on file contents
     while True:

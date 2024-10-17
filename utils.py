@@ -70,6 +70,8 @@ def read_username():
 def get_proxy():
     with open("proxy.txt", "r") as file:
         proxy_list = file.readlines()
+        if len(proxy_list) == 0:
+            return None
         proxy = proxy_list[0].strip()
 
     # remove selected proxy from file

@@ -44,8 +44,19 @@ class Scrapper(Client):
     def get_reels(self, username, count=0):
         user_id = self.user_id_from_username(username)
         medias = self.user_clips(user_id, count)
+
+        to_ret = []
+        reel_aspect_ratio = 1080/1920
+
+        print("Filtering Reels by Aspect Ratio")
+        for media in medias:
+            w = media.image_versions2['candidates'][0]['width']
+            h = media.image_versions2['candidates'][0]['height']
+            ratio = w/h
+            if ratio == reel_aspect_ratio:
+                to_ret.append(media)
         
-        return medias
+        return to_ret
     
     def check_for_new_reel(self, username, latest_reel):
         user_id = self.user_id_from_username(username)
