@@ -65,7 +65,7 @@ class Scrapper(Client):
         if media[0].code != latest_reel:
             return media[0].video_url, media[0].code
         
-        return None
+        return None, None
 
     def download_reel(self, url):
         path = self.clip_download_by_url(url)
