@@ -1,13 +1,17 @@
 import time
 import os
-import shutil
 import schedule
 import random
 import json
 import requests
+import re
 from scrapper import Scrapper
 from utils import *
 from yt import get_authenticated_service, upload_video
+import emoji
+
+def remove_emojis(text: str) -> str:
+    return emoji.replace_emoji(text, replace='')
 
 
 def get_all_reels(scrapper: Scrapper):
@@ -25,8 +29,53 @@ def get_all_reels(scrapper: Scrapper):
     print(f"Scrapped {len(reels)} reels Successfully!")
 
 
+def sanitize_description(text):
+    """Clean up description to ensure it's valid for YouTube"""
+    if not text:
+        return ""
+
+    # Handle None values
+    if text is None:
+        return ""
+
+    # Limit length to 5000 characters (YouTube's limit)
+    text = text[:5000]
+
+    # Remove potentially problematic Unicode characters
+    # Replace emojis and special characters with spaces
+    text = remove_emojis(text)
+
+    # Remove control characters
+    text = re.sub(r'[\x00-\x1F\x7F-\x9F]', '', text)
+
+    # Remove excessive hashtags (keep only first 5)
+    hashtags = re.findall(r'#\w+', text)
+    if len(hashtags) > 5:
+        for tag in hashtags[5:]:
+            text = text.replace(tag, '')
+
+    # Remove Instagram mentions (@username)
+    text = re.sub(r'@\w+', '', text)
+
+    # Remove URLs (often problematic in YouTube descriptions)
+    text = re.sub(r'https?://\S+', '', text)
+
+    # Replace multiple spaces with single space
+    text = re.sub(r'\s+', ' ', text)
+
+    # Add a standard footer
+    standard_footer = "\n\nThanks for watching!"
+    if len(text) + len(standard_footer) <= 5000:
+        text += standard_footer
+
+    return text.strip()
+
+
 def old_video_upload(scrapper: Scrapper):
+    quota_exceeded = False
     for _ in range(2):
+        if quota_exceeded:
+            break
         path = None
         old_reels = get_old_reels()
         reel = old_reels[-1]
@@ -37,9 +86,10 @@ def old_video_upload(scrapper: Scrapper):
                 reel_info = scrapper.media_info(reel)
                 youtube = get_authenticated_service()
                 titles = load_titles()
-                title = random.choice(titles) + " #shorts"
-                description = title + "\n" + reel_info.caption_text
-                print("Uploading Reel to YT")
+                title = f"{random.choice(titles)} #shorts"
+                caption = reel_info.caption_text or ""
+                description = sanitize_description(title + "\n" + caption)
+                print("Uploading Reel to YT : ", reel)
                 res = upload_video(
                     youtube,
                     path,
@@ -47,23 +97,24 @@ def old_video_upload(scrapper: Scrapper):
                     description,
                     tags=["money", "trading", "ebook"],
                 )
-                print(
-                    "Reel uploaded Successfully : ",
-                    "https://www.youtube.com/shorts/" + res["id"],
-                )
-                save_uploaded_reels(reel)
-                save_old_reels(old_reels[:-1])
-                break  # Exit loop if successful
+                if res != 'error':
+                    print(
+                        "Reel uploaded Successfully : ",
+                        "https://www.youtube.com/shorts/" + res["id"],
+                    )
+                    save_uploaded_reels(reel)
+                    save_old_reels(old_reels[:-1])
+                quota_exceeded = True
+                break
             except (Exception, requests.exceptions.ReadTimeout) as e:
-                print(f"Error uploading reel on attempt {attempt + 1}: ", reel)
+                print(f"Error on attempt {attempt + 1}: ", e)
                 if attempt < retries - 1:
                     print("Retrying...")
                     time.sleep(5)  # Wait before retrying
-                else:
-                    print(e)
             finally:
                 if path and os.path.exists(path):
                     os.remove(path)
+                print("=" * 100)
 
 
 def new_video_upload(scrapper: Scrapper):
@@ -74,7 +125,8 @@ def new_video_upload(scrapper: Scrapper):
     with open("latest_reel.txt", "r") as file:
         latest_reel = file.readline().strip()
 
-    new_reel, new_reel_code = scrapper.check_for_new_reel(username, latest_reel)
+    new_reel, new_reel_code = scrapper.check_for_new_reel(
+        username, latest_reel)
     if new_reel and new_reel not in uploaded:
         print("New Reel Detected")
         path = None
@@ -84,8 +136,9 @@ def new_video_upload(scrapper: Scrapper):
             reel_info = scrapper.media_info(reel_pk)
             youtube = get_authenticated_service()
             titles = load_titles()
-            title = random.choice(titles) + " #shorts"
-            description = title + "\n" + reel_info.caption_text
+            title = f"{random.choice(titles)} #shorts"
+            caption = reel_info.caption_text or ""
+            description = sanitize_description(title + "\n" + caption)
             print("Uploading Reel to YT")
             res = upload_video(
                 youtube,
@@ -140,7 +193,8 @@ def schedule_jobs_from_file():
     proxy = None
     if os.path.exists("proxy.txt"):
         proxy = get_proxy()
-        if proxy is not None: print(f'Using proxy: {proxy}')
+        if proxy is not None:
+            print(f'Using proxy: {proxy}')
 
     upload_scrapper = Scrapper(upload_acc[0], upload_acc[1], proxy=proxy)
 
@@ -156,9 +210,10 @@ def schedule_jobs_from_file():
             proxy = get_proxy()
             upload_scrapper.set_proxy(proxy)
     if len(times) >= 1:
-        schedule.every().day.at(times[0], 'Asia/Kolkata').do(old_video_upload, upload_scrapper)
+        schedule.every().day.at(
+            times[0], 'Asia/Kolkata').do(old_video_upload, upload_scrapper)
         schedule.every().hour.do(new_video_upload, monitoring_scrapper)
-        print("Reels will be uploaded every day at " + times[0])
+        print(f"Reels will be uploaded every day at {times[0]}")
         print("Monitoring For new reels every hour")
     else:
         print(
