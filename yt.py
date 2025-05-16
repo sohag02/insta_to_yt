@@ -1,11 +1,10 @@
+import json
 from googleapiclient.http import MediaFileUpload
 import google_auth_oauthlib.flow
 import googleapiclient.discovery
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-
 import os
-
 
 def get_authenticated_service(generate_session=False):
     api_service_name = "youtube"
@@ -53,7 +52,10 @@ def upload_video(
             "description": description,
             "tags": tags or [],
         },
-        "status": {"privacyStatus": privacy_status},
+        "status": {
+            "privacyStatus": privacy_status,
+            "selfDeclaredMadeForKids": False
+        },
     }
     request = youtube.videos().insert(
         part="snippet,status",
@@ -63,6 +65,11 @@ def upload_video(
     try:
         response = request.execute()
     except googleapiclient.errors.HttpError as e:
-        print(f"An HTTP error {e.resp.status} occurred:\n{e.content}")
-        response = "error"
+        code = e.resp.status
+        if code == 403:
+            dict_data = json.loads(e.content.decode('utf-8'))
+            print(f"An HTTP error {e.resp.status} occurred: {dict_data['error']['message']}")
+            response = "error"
+        else:
+            raise
     return response

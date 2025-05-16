@@ -8,14 +8,13 @@ import re
 from scrapper import Scrapper
 from utils import *
 from yt import get_authenticated_service, upload_video
-import emoji
+from config import Config
 
-def remove_emojis(text: str) -> str:
-    return emoji.replace_emoji(text, replace='')
+config = Config()
 
 
 def get_all_reels(scrapper: Scrapper):
-    username = read_username()
+    username = config.username
     print(f"Scrapping all reels from @{username}...")
     reels = scrapper.get_reels(username)
     with open("old_reels.json", "w") as file:
@@ -63,13 +62,18 @@ def sanitize_description(text):
     # Replace multiple spaces with single space
     text = re.sub(r'\s+', ' ', text)
 
-    # Add a standard footer
-    standard_footer = "\n\nThanks for watching!"
-    if len(text) + len(standard_footer) <= 5000:
-        text += standard_footer
-
     return text.strip()
 
+def replace_words(text:str, replacements:dict):
+    for word, replacement in replacements.items():
+        text = text.replace(word, replacement)
+    return text
+
+def edit_caption(caption:str):
+    caption = f'{config.caption_before} {caption} {config.caption_after}'
+    caption = replace_words(caption, config.replacements)
+    caption = sanitize_description(caption)
+    return caption
 
 def old_video_upload(scrapper: Scrapper):
     quota_exceeded = False
@@ -88,14 +92,15 @@ def old_video_upload(scrapper: Scrapper):
                 titles = load_titles()
                 title = f"{random.choice(titles)} #shorts"
                 caption = reel_info.caption_text or ""
-                description = sanitize_description(title + "\n" + caption)
+                description = edit_caption(title + "\n" + caption)
                 print("Uploading Reel to YT : ", reel)
                 res = upload_video(
                     youtube,
                     path,
                     title,
                     description,
-                    tags=["money", "trading", "ebook"],
+                    tags=config.tags,
+                    privacy_status="public" if config.youtube_listed else "unlisted",
                 )
                 if res != 'error':
                     print(
@@ -119,7 +124,7 @@ def old_video_upload(scrapper: Scrapper):
 
 def new_video_upload(scrapper: Scrapper):
     print("Checking for new Reel")
-    username = read_username()
+    username = config.username
     uploaded = load_uploaded_reels()
 
     with open("latest_reel.txt", "r") as file:
@@ -138,14 +143,15 @@ def new_video_upload(scrapper: Scrapper):
             titles = load_titles()
             title = f"{random.choice(titles)} #shorts"
             caption = reel_info.caption_text or ""
-            description = sanitize_description(title + "\n" + caption)
+            description = edit_caption(title + "\n" + caption)
             print("Uploading Reel to YT")
             res = upload_video(
                 youtube,
                 path,
                 title,
                 description,
-                tags=["money", "trading", "ebook"],
+                tags=config.tags,
+                privacy_status="public" if config.youtube_listed else "unlisted",
             )
             print(
                 "Reel uploaded Successfully : ",
@@ -183,10 +189,7 @@ def read_schedule_file(file_path="schedule.txt"):
     return times
 
 
-# Schedule jobs based on times from file
 def schedule_jobs_from_file():
-    times = read_schedule_file()
-
     upload_acc = get_uploding_account()
     monitoring_acc = get_monitoring_account()
 
@@ -209,16 +212,12 @@ def schedule_jobs_from_file():
         if os.path.exists("proxy.txt"):
             proxy = get_proxy()
             upload_scrapper.set_proxy(proxy)
-    if len(times) >= 1:
-        schedule.every().day.at(
-            times[0], 'Asia/Kolkata').do(old_video_upload, upload_scrapper)
-        schedule.every().hour.do(new_video_upload, monitoring_scrapper)
-        print(f"Reels will be uploaded every day at {times[0]}")
-        print("Monitoring For new reels every hour")
-    else:
-        print(
-            "Error: Schedule file does not have enough times. Please provide two times in 'schedule.txt'."
-        )
+
+    schedule.every().day.at(
+        config.upload_time, 'Asia/Kolkata').do(old_video_upload, upload_scrapper)
+    schedule.every().hour.do(new_video_upload, monitoring_scrapper)
+    print(f"Reels will be uploaded every day at {config.upload_time}")
+    print("Monitoring For new reels every hour")
 
 
 # Main loop to schedule tasks

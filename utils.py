@@ -1,8 +1,7 @@
-import json
 import os
 import csv
-
 import json
+import emoji
 
 def load_uploaded_reels():
     with open("uploaded_reels.json", "r") as file:
@@ -25,10 +24,6 @@ def generate_required_files():
     if not os.path.exists("uploaded_reels.json"):
         with open("uploaded_reels.json", "w") as file:
             json.dump({"reels": []}, file, indent=4)
-
-    if not os.path.exists("schedule.txt"):
-        with open("schedule.txt", "w") as file:
-            file.write("")
 
     if not os.path.exists("latest_reel.txt"):
         with open("latest_reel.txt", "w") as file:
@@ -89,3 +84,7 @@ def save_old_reels(reels):
 def get_old_reels():
     with open("old_reels.json", "r") as file:
         return json.load(file)["reels"]
+
+
+def remove_emojis(text: str) -> str:
+    return emoji.replace_emoji(text, replace='')
