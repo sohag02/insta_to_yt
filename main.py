@@ -9,7 +9,7 @@ from scrapper import Scrapper
 from utils import *
 from yt import get_authenticated_service, upload_video
 from config import Config
-from video import improve_video_quality
+from video import improve_video_quality, preprocess_video
 
 config = Config()
 
@@ -89,6 +89,7 @@ def old_video_upload(scrapper: Scrapper):
             try:
                 path = scrapper.clip_download(reel)
                 path = improve_video_quality(path, path)
+                path = preprocess_video(path, 'data', reel)
                 reel_info = scrapper.media_info(reel)
                 youtube = get_authenticated_service()
                 titles = load_titles()
@@ -140,6 +141,7 @@ def new_video_upload(scrapper: Scrapper):
         try:
             path = scrapper.download_reel(new_reel)
             path = improve_video_quality(path, path)
+            path = preprocess_video(path, 'data', new_reel_code)
             reel_pk = scrapper.media_pk_from_code(new_reel_code)
             reel_info = scrapper.media_info(reel_pk)
             youtube = get_authenticated_service()

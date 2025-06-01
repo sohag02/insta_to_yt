@@ -1,7 +1,9 @@
+from dataclasses import dataclass
 import os
 import csv
 import json
 import emoji
+import pandas as pd
 
 def load_uploaded_reels():
     with open("uploaded_reels.json", "r") as file:
@@ -88,3 +90,31 @@ def get_old_reels():
 
 def remove_emojis(text: str) -> str:
     return emoji.replace_emoji(text, replace='')
+
+@dataclass
+class Media:
+    path: str
+    width: int
+    height: int
+    start_time: int
+    end_time: int
+    x: int
+    y: int
+
+@dataclass
+class GreenScreen:
+    path: str
+    start_time: int
+    end_time: int
+
+def get_gif_data() -> list[Media]:
+    df = pd.read_csv('data/gif.csv')
+    return [Media(**row) for _, row in df.iterrows()]
+
+def get_png_data() -> list[Media]:
+    df = pd.read_csv('data/png.csv')
+    return [Media(**row) for _, row in df.iterrows()]
+
+def get_green_screen_data() -> list[GreenScreen]:
+    df = pd.read_csv('data/green_screen.csv')
+    return [GreenScreen(**row) for _, row in df.iterrows()]
